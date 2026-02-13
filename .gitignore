@@ -43,6 +43,9 @@ infra/terraform/*.tfstate.backup
 infra/terraform/*.tfvars
 !infra/terraform/*.tfvars.example
 
+# Redis
+dump.rdb
+
 # Logs
 *.log
 npm-debug.log*
