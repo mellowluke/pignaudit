@@ -1,0 +1,6 @@
+{
+  "buildCommand": "pnpm turbo build --filter=@pignaudit/web",
+  "installCommand": "pnpm install",
+  "framework": "nextjs",
+  "outputDirectory": "apps/web/.next"
+}
