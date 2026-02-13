@@ -1,0 +1,6 @@
+{
+  "name": "@pignaudit/config",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./eslint-preset.js"
+}

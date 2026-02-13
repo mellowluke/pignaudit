@@ -1,0 +1,121 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main, develop]
+
+concurrency:
+  group: deploy-${{ github.ref_name }}
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY_WEB: pignaudit-web
+  ECR_REPOSITORY_WORKERS: pignaudit-workers
+
+jobs:
+  determine-environment:
+    name: Determine Environment
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.env.outputs.environment }}
+      ecs_cluster: ${{ steps.env.outputs.ecs_cluster }}
+    steps:
+      - id: env
+        run: |
+          if [[ "${{ github.ref_name }}" == "main" ]]; then
+            echo "environment=production" >> $GITHUB_OUTPUT
+            echo "ecs_cluster=pignaudit-prod" >> $GITHUB_OUTPUT
+          else
+            echo "environment=staging" >> $GITHUB_OUTPUT
+            echo "ecs_cluster=pignaudit-staging" >> $GITHUB_OUTPUT
+          fi
+
+  build-and-push:
+    name: Build & Push Docker Images
+    runs-on: ubuntu-latest
+    needs: [determine-environment]
+    environment: ${{ needs.determine-environment.outputs.environment }}
+    outputs:
+      web_image: ${{ steps.build-web.outputs.image }}
+      workers_image: ${{ steps.build-workers.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push web image
+        id: build-web
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -f infra/docker/Dockerfile.web -t $ECR_REGISTRY/$ECR_REPOSITORY_WEB:$IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPOSITORY_WEB:latest .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY_WEB --all-tags
+          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY_WEB:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+      - name: Build and push workers image
+        id: build-workers
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -f infra/docker/Dockerfile.workers -t $ECR_REGISTRY/$ECR_REPOSITORY_WORKERS:$IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPOSITORY_WORKERS:latest .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY_WORKERS --all-tags
+          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY_WORKERS:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+  deploy:
+    name: Deploy to ${{ needs.determine-environment.outputs.environment }}
+    runs-on: ubuntu-latest
+    needs: [determine-environment, build-and-push]
+    environment: ${{ needs.determine-environment.outputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy web service to ECS
+        run: |
+          aws ecs update-service \
+            --cluster ${{ needs.determine-environment.outputs.ecs_cluster }} \
+            --service pignaudit-web \
+            --force-new-deployment \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Deploy workers service to ECS
+        run: |
+          aws ecs update-service \
+            --cluster ${{ needs.determine-environment.outputs.ecs_cluster }} \
+            --service pignaudit-workers \
+            --force-new-deployment \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Wait for web service stability
+        run: |
+          aws ecs wait services-stable \
+            --cluster ${{ needs.determine-environment.outputs.ecs_cluster }} \
+            --services pignaudit-web \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Wait for workers service stability
+        run: |
+          aws ecs wait services-stable \
+            --cluster ${{ needs.determine-environment.outputs.ecs_cluster }} \
+            --services pignaudit-workers \
+            --region ${{ env.AWS_REGION }}

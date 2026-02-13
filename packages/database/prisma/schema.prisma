@@ -1,0 +1,334 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// IAM & Multi-tenancy
+// =============================================================================
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users             User[]
+  auditableEntities AuditableEntity[]
+  auditPlans        AuditPlan[]
+  engagements       AuditEngagement[]
+
+  @@map("organizations")
+}
+
+model User {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  name           String
+  hashedPassword String?
+  role           UserRole @default(AUDITOR)
+  organizationId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization        Organization          @relation(fields: [organizationId], references: [id])
+  assignedEngagements EngagementAssignment[]
+  findings            Finding[]
+  auditLogs           AuditLog[]
+
+  @@index([organizationId])
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  AUDIT_MANAGER
+  AUDITOR
+  VIEWER
+}
+
+// =============================================================================
+// Audit Universe & Planning
+// =============================================================================
+
+model AuditableEntity {
+  id             String              @id @default(cuid())
+  name           String
+  description    String?
+  entityType     AuditableEntityType
+  riskRating     RiskRating          @default(MEDIUM)
+  organizationId String
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  organization Organization      @relation(fields: [organizationId], references: [id])
+  engagements  AuditEngagement[]
+
+  @@index([organizationId])
+  @@map("auditable_entities")
+}
+
+enum AuditableEntityType {
+  DEPARTMENT
+  PROCESS
+  BUSINESS_UNIT
+  SYSTEM
+  LOCATION
+}
+
+enum RiskRating {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+model AuditPlan {
+  id             String         @id @default(cuid())
+  name           String
+  description    String?
+  fiscalYear     Int
+  quarter        Int?
+  status         AuditPlanStatus @default(DRAFT)
+  organizationId String
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  organization Organization      @relation(fields: [organizationId], references: [id])
+  engagements  AuditEngagement[]
+
+  @@index([organizationId])
+  @@map("audit_plans")
+}
+
+enum AuditPlanStatus {
+  DRAFT
+  APPROVED
+  IN_PROGRESS
+  COMPLETED
+}
+
+// =============================================================================
+// Engagements & Fieldwork
+// =============================================================================
+
+model AuditEngagement {
+  id                String           @id @default(cuid())
+  title             String
+  description       String?
+  status            EngagementStatus @default(PLANNING)
+  startDate         DateTime?
+  endDate           DateTime?
+  auditPlanId       String?
+  auditableEntityId String?
+  organizationId    String
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  auditPlan       AuditPlan?             @relation(fields: [auditPlanId], references: [id])
+  auditableEntity AuditableEntity?       @relation(fields: [auditableEntityId], references: [id])
+  organization    Organization           @relation(fields: [organizationId], references: [id])
+  assignments     EngagementAssignment[]
+  workPrograms    WorkProgram[]
+  findings        Finding[]
+  reports         AuditReport[]
+
+  @@index([organizationId])
+  @@index([auditPlanId])
+  @@map("audit_engagements")
+}
+
+enum EngagementStatus {
+  PLANNING
+  FIELDWORK
+  REVIEW
+  REPORTING
+  COMPLETED
+  CANCELLED
+}
+
+model EngagementAssignment {
+  id           String         @id @default(cuid())
+  engagementId String
+  userId       String
+  role         AssignmentRole @default(AUDITOR)
+  createdAt    DateTime       @default(now())
+
+  engagement AuditEngagement @relation(fields: [engagementId], references: [id])
+  user       User            @relation(fields: [userId], references: [id])
+
+  @@unique([engagementId, userId])
+  @@map("engagement_assignments")
+}
+
+enum AssignmentRole {
+  LEAD_AUDITOR
+  AUDITOR
+  REVIEWER
+  OBSERVER
+}
+
+model WorkProgram {
+  id           String @id @default(cuid())
+  title        String
+  description  String?
+  engagementId String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  engagement     AuditEngagement @relation(fields: [engagementId], references: [id])
+  testProcedures TestProcedure[]
+
+  @@index([engagementId])
+  @@map("work_programs")
+}
+
+model TestProcedure {
+  id            String              @id @default(cuid())
+  title         String
+  description   String?
+  status        TestProcedureStatus @default(NOT_STARTED)
+  conclusion    String?
+  workProgramId String
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  workProgram WorkProgram @relation(fields: [workProgramId], references: [id])
+  workpapers  Workpaper[]
+
+  @@index([workProgramId])
+  @@map("test_procedures")
+}
+
+enum TestProcedureStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  NOT_APPLICABLE
+}
+
+model Workpaper {
+  id              String @id @default(cuid())
+  fileName        String
+  fileKey         String // S3 object key
+  fileSize        Int
+  mimeType        String
+  testProcedureId String
+  createdAt       DateTime @default(now())
+
+  testProcedure TestProcedure @relation(fields: [testProcedureId], references: [id])
+
+  @@index([testProcedureId])
+  @@map("workpapers")
+}
+
+// =============================================================================
+// Findings & Issues
+// =============================================================================
+
+model Finding {
+  id                 String        @id @default(cuid())
+  title              String
+  description        String
+  severity           RiskRating    @default(MEDIUM)
+  status             FindingStatus @default(OPEN)
+  recommendation     String?
+  managementResponse String?
+  dueDate            DateTime?
+  engagementId       String
+  reportedById       String
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  engagement AuditEngagement @relation(fields: [engagementId], references: [id])
+  reportedBy User            @relation(fields: [reportedById], references: [id])
+  actionItems ActionItem[]
+
+  @@index([engagementId])
+  @@index([status])
+  @@map("findings")
+}
+
+enum FindingStatus {
+  OPEN
+  IN_REMEDIATION
+  AWAITING_VALIDATION
+  CLOSED
+  RISK_ACCEPTED
+}
+
+model ActionItem {
+  id          String           @id @default(cuid())
+  title       String
+  description String?
+  status      ActionItemStatus @default(OPEN)
+  dueDate     DateTime?
+  findingId   String
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  finding Finding @relation(fields: [findingId], references: [id])
+
+  @@index([findingId])
+  @@map("action_items")
+}
+
+enum ActionItemStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  OVERDUE
+}
+
+// =============================================================================
+// Reports
+// =============================================================================
+
+model AuditReport {
+  id           String       @id @default(cuid())
+  title        String
+  status       ReportStatus @default(DRAFT)
+  content      String?      // Rich text / markdown content
+  fileKey      String?      // S3 key for generated PDF
+  engagementId String
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  engagement AuditEngagement @relation(fields: [engagementId], references: [id])
+
+  @@index([engagementId])
+  @@map("audit_reports")
+}
+
+enum ReportStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  DISTRIBUTED
+}
+
+// =============================================================================
+// System Audit Trail
+// =============================================================================
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  action     String
+  entityType String
+  entityId   String
+  changes    Json?
+  userId     String
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
