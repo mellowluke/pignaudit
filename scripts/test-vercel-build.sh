@@ -6,9 +6,11 @@
 # This catches issues that don't appear locally (e.g., missing prisma generate,
 # unresolved workspace deps, missing env vars, turbo pipeline failures).
 #
-# Vercel behavior: when turbo.json is detected, Vercel may override the
-# buildCommand with its own turbo-based build. This simulation tests BOTH
-# the explicit vercel.json command AND the turbo pipeline path.
+# Vercel behavior:
+# - When turbo.json is detected, Vercel may override buildCommand
+# - outputDirectory is relative to the Vercel project "Root Directory"
+#   (configured in Vercel dashboard, defaults to apps/web for this project)
+# - Install runs at the repo root; build runs at the repo root
 #
 # Usage: ./scripts/test-vercel-build.sh
 # =============================================================================
@@ -25,20 +27,21 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD_DIR="/tmp/vercel-build-sim-$$"
 FAILURES=0
 
+# Vercel project "Root Directory" setting (from Vercel dashboard)
+VERCEL_ROOT_DIR="apps/web"
+
 cleanup() {
   echo -e "\n${BLUE}[cleanup]${NC} Removing build directory: $BUILD_DIR"
   rm -rf "$BUILD_DIR"
 }
 trap cleanup EXIT
 
-# Creates a clean-room copy of the repo (simulates fresh git clone)
 create_clean_room() {
   rm -rf "$BUILD_DIR"
   mkdir -p "$BUILD_DIR"
   git -C "$REPO_ROOT" archive HEAD | tar -x -C "$BUILD_DIR"
 }
 
-# Runs pnpm install in the clean-room
 run_install() {
   local install_cmd="$1"
   cd "$BUILD_DIR"
@@ -51,10 +54,9 @@ run_install() {
   fi
 }
 
-# Runs a build command and checks for output
 run_build() {
   local build_cmd="$1"
-  local output_dir="$2"
+  local output_path="$2"
   cd "$BUILD_DIR"
   if eval "$build_cmd" 2>&1; then
     echo -e "${GREEN}  -> Build succeeded${NC}"
@@ -64,13 +66,13 @@ run_build() {
     return $exit_code
   fi
 
-  # Verify output exists
-  if [ -d "$BUILD_DIR/$output_dir" ]; then
+  if [ -d "$BUILD_DIR/$output_path" ]; then
     local file_count
-    file_count=$(find "$BUILD_DIR/$output_dir" -type f | wc -l)
-    echo -e "${GREEN}  -> Output: $output_dir ($file_count files)${NC}"
+    file_count=$(find "$BUILD_DIR/$output_path" -type f | wc -l)
+    echo -e "${GREEN}  -> Output: $output_path ($file_count files)${NC}"
   else
-    echo -e "${RED}  -> Output directory NOT found: $output_dir${NC}"
+    echo -e "${RED}  -> Output directory NOT found: $output_path${NC}"
+    echo -e "${RED}     Vercel would show: The Next.js output directory was not found${NC}"
     return 1
   fi
 }
@@ -84,12 +86,18 @@ echo -e "\n${YELLOW}[config]${NC} Reading vercel.json..."
 INSTALL_CMD=$(python3 -c "import json; c=json.load(open('$REPO_ROOT/vercel.json')); print(c.get('installCommand', 'npm install'))")
 BUILD_CMD=$(python3 -c "import json; c=json.load(open('$REPO_ROOT/vercel.json')); print(c.get('buildCommand', 'npm run build'))")
 OUTPUT_DIR=$(python3 -c "import json; c=json.load(open('$REPO_ROOT/vercel.json')); print(c.get('outputDirectory', '.next'))")
-echo -e "  installCommand:  ${BLUE}$INSTALL_CMD${NC}"
-echo -e "  buildCommand:    ${BLUE}$BUILD_CMD${NC}"
-echo -e "  outputDirectory: ${BLUE}$OUTPUT_DIR${NC}"
+
+# Vercel resolves outputDirectory relative to the project Root Directory
+ACTUAL_OUTPUT="$VERCEL_ROOT_DIR/$OUTPUT_DIR"
+
+echo -e "  installCommand:   ${BLUE}$INSTALL_CMD${NC}"
+echo -e "  buildCommand:     ${BLUE}$BUILD_CMD${NC}"
+echo -e "  outputDirectory:  ${BLUE}$OUTPUT_DIR${NC}"
+echo -e "  Vercel root dir:  ${BLUE}$VERCEL_ROOT_DIR${NC}"
+echo -e "  Resolved output:  ${BLUE}$ACTUAL_OUTPUT${NC}"
 
 # ======================================================================
-# Test 1: Explicit vercel.json buildCommand (what vercel.json says)
+# Test 1: vercel.json buildCommand + output path validation
 # ======================================================================
 echo -e "\n${BLUE}========================================${NC}"
 echo -e "${YELLOW}[Test 1/3]${NC} vercel.json buildCommand"
@@ -99,7 +107,7 @@ echo -e "  Command: ${BLUE}$BUILD_CMD${NC}"
 create_clean_room
 echo -e "  Clean-room created (no node_modules, no .env files)"
 
-if run_install "$INSTALL_CMD" && run_build "$BUILD_CMD" "$OUTPUT_DIR"; then
+if run_install "$INSTALL_CMD" && run_build "$BUILD_CMD" "$ACTUAL_OUTPUT"; then
   echo -e "${GREEN}  => Test 1 PASSED${NC}"
 else
   echo -e "${RED}  => Test 1 FAILED${NC}"
@@ -107,7 +115,7 @@ else
 fi
 
 # ======================================================================
-# Test 2: Turbo pipeline (what Vercel actually runs when it detects turbo)
+# Test 2: Turbo pipeline (Vercel turbo detection path)
 # ======================================================================
 echo -e "\n${BLUE}========================================${NC}"
 echo -e "${YELLOW}[Test 2/3]${NC} Turbo pipeline (Vercel turbo detection)"
@@ -118,7 +126,7 @@ echo -e "  Command: ${BLUE}$TURBO_CMD${NC}"
 create_clean_room
 echo -e "  Clean-room created (no node_modules, no .env files)"
 
-if run_install "$INSTALL_CMD" && run_build "$TURBO_CMD" "$OUTPUT_DIR"; then
+if run_install "$INSTALL_CMD" && run_build "$TURBO_CMD" "$ACTUAL_OUTPUT"; then
   echo -e "${GREEN}  => Test 2 PASSED${NC}"
 else
   echo -e "${RED}  => Test 2 FAILED${NC}"
@@ -126,7 +134,7 @@ else
 fi
 
 # ======================================================================
-# Test 3: Direct next build (fallback/debug path)
+# Test 3: Direct next build (fallback)
 # ======================================================================
 echo -e "\n${BLUE}========================================${NC}"
 echo -e "${YELLOW}[Test 3/3]${NC} Direct next build (fallback)"
@@ -137,7 +145,7 @@ echo -e "  Command: ${BLUE}$DIRECT_CMD${NC}"
 create_clean_room
 echo -e "  Clean-room created (no node_modules, no .env files)"
 
-if run_install "$INSTALL_CMD" && run_build "$DIRECT_CMD" "$OUTPUT_DIR"; then
+if run_install "$INSTALL_CMD" && run_build "$DIRECT_CMD" "$ACTUAL_OUTPUT"; then
   echo -e "${GREEN}  => Test 3 PASSED${NC}"
 else
   echo -e "${RED}  => Test 3 FAILED${NC}"
