@@ -137,6 +137,9 @@ model AuditEngagement {
   workPrograms    WorkProgram[]
   findings        Finding[]
   reports         AuditReport[]
+  documents       EngagementDocument[]
+  trailEvents     AuditTrailEvent[]
+  policyFlags     PolicyFlag[]
 
   @@index([organizationId])
   @@index([auditPlanId])
@@ -315,6 +318,36 @@ enum ReportStatus {
 }
 
 // =============================================================================
+// Engagement Documents
+// =============================================================================
+
+model EngagementDocument {
+  id             String           @id @default(cuid())
+  engagementId   String
+  category       DocumentCategory
+  fileName       String
+  fileKey        String?          // S3 object key (null until backend storage)
+  fileSize       Int
+  mimeType       String
+  uploadedById   String?
+  version        Int              @default(1)
+  replacesId     String?          // links to previous version
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  engagement AuditEngagement @relation(fields: [engagementId], references: [id])
+
+  @@index([engagementId, category])
+  @@map("engagement_documents")
+}
+
+enum DocumentCategory {
+  DOCUMENTATION
+  TESTING
+  FINDINGS
+}
+
+// =============================================================================
 // System Audit Trail
 // =============================================================================
 
@@ -333,4 +366,74 @@ model AuditLog {
   @@index([userId])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+// =============================================================================
+// Traceability: Audit Trail Events & Policy Engine
+// =============================================================================
+
+model AuditTrailEvent {
+  id             String   @id @default(cuid())
+  engagementId   String
+  eventType      String   // DOCUMENT_UPLOADED, DOCUMENT_REMOVED, DOCUMENT_REPLACED, STATUS_CHANGED, etc.
+  category       String?  // document category or area (e.g., "DOCUMENTATION", "TESTING")
+  targetId       String?  // ID of the affected entity (document, finding, etc.)
+  targetName     String?  // human-readable name (filename, finding title)
+  metadata       Json?    // flexible context: { previousStatus, newStatus, fileSize, ... }
+  actorId        String?
+  actorName      String
+  createdAt      DateTime @default(now())
+
+  engagement  AuditEngagement @relation(fields: [engagementId], references: [id])
+  policyFlags PolicyFlag[]
+
+  @@index([engagementId, createdAt])
+  @@index([eventType])
+  @@map("audit_trail_events")
+}
+
+model PolicyRule {
+  id          String          @id @default(cuid())
+  code        String          @unique // e.g., "TESTING_REQUIRES_FIELDWORK"
+  name        String
+  description String
+  category    String          // PHASE_GATE, DOCUMENT_CONTROL, APPROVAL_REQUIRED, RETENTION, etc.
+  triggerEvent String         // event type that activates this rule
+  condition   Json            // flexible rule definition evaluated by policy engine
+  severity    PolicySeverity  @default(WARNING)
+  enabled     Boolean         @default(true)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  flags PolicyFlag[]
+
+  @@map("policy_rules")
+}
+
+enum PolicySeverity {
+  INFO
+  WARNING
+  VIOLATION
+}
+
+model PolicyFlag {
+  id             String         @id @default(cuid())
+  engagementId   String
+  policyRuleId   String
+  eventId        String
+  severity       PolicySeverity
+  message        String
+  resolved       Boolean        @default(false)
+  resolvedById   String?
+  resolvedNote   String?
+  resolvedAt     DateTime?
+  createdAt      DateTime       @default(now())
+
+  engagement AuditEngagement @relation(fields: [engagementId], references: [id])
+  policyRule PolicyRule      @relation(fields: [policyRuleId], references: [id])
+  event      AuditTrailEvent @relation(fields: [eventId], references: [id])
+
+  @@index([engagementId, resolved])
+  @@index([policyRuleId])
+  @@map("policy_flags")
 }

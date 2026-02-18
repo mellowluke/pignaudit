@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { mockEngagements, mockFindings } from "@/lib/mock-data";
 import { StatusBadge, RiskBadge } from "@/components/status-badge";
-import EngagementDocuments from "@/components/engagement-documents";
+import EngagementDocuments, {
+  AuditTrailTimeline,
+  PolicyFlagsPanel,
+} from "@/components/engagement-documents";
 
 export default function EngagementDetailPage({
   params,
@@ -89,9 +92,32 @@ export default function EngagementDetailPage({
         </div>
       </div>
 
-      {/* Audit Documents */}
+      {/* Audit Documents with traceability */}
       <div className="mb-8">
-        <EngagementDocuments engagementId={engagement.id} />
+        <EngagementDocuments
+          engagementId={engagement.id}
+          engagementStatus={engagement.status}
+        />
+      </div>
+
+      {/* Traceability panels */}
+      <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="rounded-lg border border-gray-200 bg-white p-6">
+          <h2 className="mb-4 text-lg font-semibold text-gray-900">
+            Audit Trail
+          </h2>
+          <AuditTrailTimeline
+            engagementId={engagement.id}
+            engagementStatus={engagement.status}
+          />
+        </div>
+
+        <div className="rounded-lg border border-gray-200 bg-white p-6">
+          <h2 className="mb-4 text-lg font-semibold text-gray-900">
+            Policy Rules
+          </h2>
+          <PolicyFlagsPanel engagementId={engagement.id} />
+        </div>
       </div>
 
       {/* Findings */}
