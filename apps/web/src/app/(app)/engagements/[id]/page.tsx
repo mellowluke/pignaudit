@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { mockEngagements, mockFindings } from "@/lib/mock-data";
 import { StatusBadge, RiskBadge } from "@/components/status-badge";
+import EngagementDocuments from "@/components/engagement-documents";
 
 export default function EngagementDetailPage({
   params,
@@ -88,6 +89,12 @@ export default function EngagementDetailPage({
         </div>
       </div>
 
+      {/* Audit Documents */}
+      <div className="mb-8">
+        <EngagementDocuments engagementId={engagement.id} />
+      </div>
+
+      {/* Findings */}
       <div className="rounded-lg border border-gray-200 bg-white">
         <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
           <h2 className="text-lg font-semibold text-gray-900">
