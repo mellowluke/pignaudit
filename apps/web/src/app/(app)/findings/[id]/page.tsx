@@ -108,6 +108,20 @@ export default function FindingDetailPage({
                 <dt className="text-xs font-medium uppercase text-gray-500">Due Date</dt>
                 <dd className="mt-1 text-sm text-gray-900">{finding.dueDate}</dd>
               </div>
+              {finding.originalDueDate && (
+                <>
+                  <div>
+                    <dt className="text-xs font-medium uppercase text-gray-500">Original Due Date</dt>
+                    <dd className="mt-1 text-sm text-gray-900">{finding.originalDueDate}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-medium uppercase text-gray-500">Reason for Extension</dt>
+                    <dd className="mt-1 text-sm text-gray-900">
+                      {finding.dueDateExtensionReason || "No reason provided"}
+                    </dd>
+                  </div>
+                </>
+              )}
               <div>
                 <dt className="text-xs font-medium uppercase text-gray-500">Engagement</dt>
                 <dd className="mt-1 text-sm text-indigo-600">

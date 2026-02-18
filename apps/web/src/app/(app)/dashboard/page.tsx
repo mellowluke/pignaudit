@@ -22,21 +22,25 @@ export default function DashboardPage() {
           label="Active Engagements"
           value={stats.activeEngagements}
           color="indigo"
+          href="/engagements?status=active"
         />
         <StatCard
           label="Open Findings"
           value={stats.openFindings}
           color="red"
+          href="/findings?status=OPEN"
         />
         <StatCard
           label="Critical Findings"
           value={stats.criticalFindings}
           color="orange"
+          href="/findings?risk=CRITICAL"
         />
         <StatCard
           label="Overdue Findings"
           value={stats.overdueFindings}
           color="yellow"
+          href="/findings?overdue=true"
         />
       </div>
 
@@ -58,7 +62,11 @@ export default function DashboardPage() {
                 LOW: "bg-green-500",
               };
               return (
-                <div key={level} className="flex items-center gap-3">
+                <Link
+                  key={level}
+                  href={`/findings?risk=${level}`}
+                  className="flex items-center gap-3 rounded-md px-2 py-1 -mx-2 hover:bg-gray-50 transition-colors"
+                >
                   <span className="w-20 text-sm font-medium text-gray-600">
                     {level}
                   </span>
@@ -73,7 +81,7 @@ export default function DashboardPage() {
                   <span className="w-8 text-right text-sm font-semibold text-gray-900">
                     {count}
                   </span>
-                </div>
+                </Link>
               );
             })}
           </div>
@@ -92,12 +100,16 @@ export default function DashboardPage() {
                   status as keyof typeof stats.engagementsByStatus
                 ];
               return (
-                <div key={status} className="flex items-center justify-between">
+                <Link
+                  key={status}
+                  href={`/engagements?status=${status}`}
+                  className="flex items-center justify-between rounded-md px-2 py-1 -mx-2 hover:bg-gray-50 transition-colors"
+                >
                   <StatusBadge status={status} />
                   <span className="text-sm font-semibold text-gray-900">
                     {count}
                   </span>
-                </div>
+                </Link>
               );
             })}
           </div>
@@ -180,10 +192,12 @@ function StatCard({
   label,
   value,
   color,
+  href,
 }: {
   label: string;
   value: number;
   color: string;
+  href: string;
 }) {
   const colorMap: Record<string, string> = {
     indigo: "border-indigo-200 bg-indigo-50 text-indigo-700",
@@ -194,11 +208,12 @@ function StatCard({
   };
 
   return (
-    <div
-      className={`rounded-lg border p-5 ${colorMap[color] || "border-gray-200 bg-white"}`}
+    <Link
+      href={href}
+      className={`block rounded-lg border p-5 transition-shadow hover:shadow-md ${colorMap[color] || "border-gray-200 bg-white"}`}
     >
       <p className="text-sm font-medium opacity-75">{label}</p>
       <p className="mt-1 text-3xl font-bold">{value}</p>
-    </div>
+    </Link>
   );
 }

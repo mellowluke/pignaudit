@@ -70,6 +70,8 @@ export const mockFindings = [
     riskRating: "HIGH" as const,
     owner: "John Martinez",
     dueDate: "2026-03-01",
+    originalDueDate: null as string | null,
+    dueDateExtensionReason: null as string | null,
     dateIdentified: "2026-01-22",
   },
   {
@@ -80,6 +82,8 @@ export const mockFindings = [
     riskRating: "CRITICAL" as const,
     owner: "Lisa Wang",
     dueDate: "2026-02-15",
+    originalDueDate: "2026-01-15",
+    dueDateExtensionReason: "Vendor system migration delayed implementation of new approval workflow",
     dateIdentified: "2025-12-10",
   },
   {
@@ -90,6 +94,8 @@ export const mockFindings = [
     riskRating: "MEDIUM" as const,
     owner: "Tom Nguyen",
     dueDate: "2026-02-28",
+    originalDueDate: null as string | null,
+    dueDateExtensionReason: null as string | null,
     dateIdentified: "2026-01-18",
   },
   {
@@ -100,6 +106,8 @@ export const mockFindings = [
     riskRating: "HIGH" as const,
     owner: "Rachel Adams",
     dueDate: "2026-03-15",
+    originalDueDate: "2026-02-15",
+    dueDateExtensionReason: "Awaiting response from three key vendors on updated compliance questionnaires",
     dateIdentified: "2026-01-05",
   },
   {
@@ -110,6 +118,8 @@ export const mockFindings = [
     riskRating: "LOW" as const,
     owner: "Kevin Brown",
     dueDate: "2025-11-30",
+    originalDueDate: null as string | null,
+    dueDateExtensionReason: null as string | null,
     dateIdentified: "2025-10-15",
   },
   {
@@ -120,6 +130,8 @@ export const mockFindings = [
     riskRating: "CRITICAL" as const,
     owner: "Tom Nguyen",
     dueDate: "2026-02-20",
+    originalDueDate: null as string | null,
+    dueDateExtensionReason: null as string | null,
     dateIdentified: "2026-01-12",
   },
   {
@@ -130,6 +142,8 @@ export const mockFindings = [
     riskRating: "HIGH" as const,
     owner: "Lisa Wang",
     dueDate: "2026-03-10",
+    originalDueDate: "2026-02-10",
+    dueDateExtensionReason: "ERP vendor requires additional lead time for privilege restructuring in production",
     dateIdentified: "2026-01-25",
   },
 ];
