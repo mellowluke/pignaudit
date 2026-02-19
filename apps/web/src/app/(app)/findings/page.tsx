@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { mockFindings } from "@/lib/mock-data";
+import { mockFindings, type FindingWorkflowStatus } from "@/lib/mock-data";
 import { StatusBadge, RiskBadge } from "@/components/status-badge";
 
 const TODAY = "2026-02-18";
@@ -110,6 +110,9 @@ export default function FindingsPage({
                 Risk
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                Workflow
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                 Owner
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
@@ -123,7 +126,7 @@ export default function FindingsPage({
           <tbody className="divide-y divide-gray-100">
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-6 py-12 text-center text-sm text-gray-500">
+                <td colSpan={8} className="px-6 py-12 text-center text-sm text-gray-500">
                   No findings match the current filters.
                 </td>
               </tr>
@@ -148,6 +151,9 @@ export default function FindingsPage({
                   </td>
                   <td className="px-6 py-4">
                     <RiskBadge risk={f.riskRating} />
+                  </td>
+                  <td className="whitespace-nowrap px-6 py-4">
+                    <WorkflowBadge status={f.workflowStatus} />
                   </td>
                   <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-600">
                     {f.owner}
@@ -174,6 +180,23 @@ export default function FindingsPage({
         </table>
       </div>
     </div>
+  );
+}
+
+const WORKFLOW_STYLES: Record<FindingWorkflowStatus, string> = {
+  DRAFT: "bg-gray-100 text-gray-600",
+  SUBMITTED: "bg-yellow-100 text-yellow-700",
+  REVIEWED: "bg-blue-100 text-blue-700",
+  APPROVED: "bg-indigo-100 text-indigo-700",
+  CLOSED: "bg-green-100 text-green-700",
+};
+
+function WorkflowBadge({ status }: { status: FindingWorkflowStatus }) {
+  const style = WORKFLOW_STYLES[status] ?? WORKFLOW_STYLES.DRAFT;
+  return (
+    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${style}`}>
+      {status.charAt(0) + status.slice(1).toLowerCase()}
+    </span>
   );
 }
 
