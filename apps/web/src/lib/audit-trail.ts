@@ -68,27 +68,27 @@ export type PolicyCondition =
   | RequiredDocumentCondition
   | ApprovalRequiredCondition;
 
-interface PhaseGateCondition {
+export interface PhaseGateCondition {
   type: "phase_gate";
   documentCategory: string;
   requiredPhase: string;
   requiredPhaseOrder: number;
 }
 
-interface RetroactiveChangeCondition {
+export interface RetroactiveChangeCondition {
   type: "retroactive_change";
   documentCategory: string;
   dependentCategories: string[];
 }
 
-interface RequiredDocumentCondition {
+export interface RequiredDocumentCondition {
   type: "required_document";
   requiredInPhase: string;
   documentCategory: string;
   minCount: number;
 }
 
-interface ApprovalRequiredCondition {
+export interface ApprovalRequiredCondition {
   type: "approval_required";
   documentCategory: string;
   forPhaseTransition: string;
@@ -218,7 +218,7 @@ export const DEFAULT_POLICY_RULES: PolicyRule[] = [
 // Policy Engine — evaluates rules against events
 // ---------------------------------------------------------------------------
 
-interface EvaluationContext {
+export interface EvaluationContext {
   engagementStatus: string;
   documentCounts: Record<string, number>;
 }
