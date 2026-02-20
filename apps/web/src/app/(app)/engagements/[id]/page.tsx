@@ -1,7 +1,23 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
-import { mockEngagements, mockFindings, mockWorkpapers, getAuditGroupLabel, SECTION_PHASES, type SectionState, type Signoff, type FieldworkWorkpaper } from "@/lib/mock-data";
+import {
+  mockEngagements,
+  mockFindings,
+  mockWorkpapers,
+  mockSectionDocuments,
+  getAuditGroupLabel,
+  SECTION_PHASES,
+  SECTION_FOLDERS,
+  type SectionPhase,
+  type SectionState,
+  type Signoff,
+  type FieldworkWorkpaper,
+  type SectionDocument,
+  type SectionFolder,
+} from "@/lib/mock-data";
 import { StatusBadge, RiskBadge } from "@/components/status-badge";
-import EngagementDocuments from "@/components/engagement-documents";
 
 export default function EngagementDetailPage({
   params,
@@ -20,6 +36,7 @@ export default function EngagementDetailPage({
 
   const findings = mockFindings.filter((f) => f.engagementId === engagement.id);
   const workpapers = mockWorkpapers.filter((w) => w.engagementId === engagement.id);
+  const sectionDocs = mockSectionDocuments[engagement.id] ?? [];
 
   return (
     <div>
@@ -78,12 +95,17 @@ export default function EngagementDetailPage({
         </div>
       </div>
 
-      {/* Engagement Sections (Planning, Fieldwork, Reporting, Closing) */}
+      {/* Engagement Sections with document folders */}
       <div className="mb-8">
         <h2 className="mb-4 text-lg font-semibold text-gray-900">Engagement Sections</h2>
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
+        <div className="space-y-4">
           {engagement.sections.map((section) => (
-            <SectionCard key={section.phase} section={section} />
+            <SectionPanel
+              key={section.phase}
+              section={section}
+              documents={sectionDocs}
+              engagementId={engagement.id}
+            />
           ))}
         </div>
       </div>
@@ -106,11 +128,6 @@ export default function EngagementDetailPage({
             ))}
           </div>
         )}
-      </div>
-
-      {/* Audit Documents */}
-      <div className="mb-8">
-        <EngagementDocuments engagementId={engagement.id} engagementStatus={engagement.status} />
       </div>
 
       {/* Findings */}
@@ -152,9 +169,9 @@ export default function EngagementDetailPage({
   );
 }
 
-// ---------------------------------------------------------------------------
-// Section card with signoff/approval workflow
-// ---------------------------------------------------------------------------
+// =============================================================================
+// Section Panel — collapsible section with signoff + document folders
+// =============================================================================
 
 const SECTION_STATUS_STYLES: Record<string, { bg: string; text: string; label: string }> = {
   PENDING: { bg: "bg-gray-100", text: "text-gray-600", label: "Pending" },
@@ -168,31 +185,238 @@ const ROLE_LABELS: Record<string, string> = {
   APPROVER: "Approved by",
 };
 
-function SectionCard({ section }: { section: SectionState }) {
+const SECTION_NUMBERS: Record<SectionPhase, string> = {
+  PLANNING: "01",
+  FIELDWORK: "02",
+  REPORTING: "03",
+  CLOSING: "04",
+};
+
+function SectionPanel({
+  section,
+  documents,
+  engagementId,
+}: {
+  section: SectionState;
+  documents: SectionDocument[];
+  engagementId: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
   const phaseLabel = SECTION_PHASES.find((p) => p.key === section.phase)?.label ?? section.phase;
   const style = SECTION_STATUS_STYLES[section.status] ?? SECTION_STATUS_STYLES.PENDING;
+  const folders = SECTION_FOLDERS[section.phase] ?? [];
+  const sectionNum = SECTION_NUMBERS[section.phase];
+
+  const phaseDocs = documents.filter((d) =>
+    folders.some((f) => f.code === d.folderCode)
+  );
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-gray-900">{phaseLabel}</h3>
-        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${style.bg} ${style.text}`}>
-          {style.label}
-        </span>
-      </div>
+    <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
+      {/* Section header — click to expand */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex w-full items-center justify-between px-6 py-4 text-left hover:bg-gray-50 transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-xs font-bold text-indigo-700">
+            {sectionNum}
+          </span>
+          <div>
+            <p className="text-sm font-semibold text-gray-900">{phaseLabel}</p>
+            <p className="text-xs text-gray-500">
+              {folders.length} folders &middot; {phaseDocs.length} document{phaseDocs.length !== 1 ? "s" : ""} uploaded
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${style.bg} ${style.text}`}>
+            {style.label}
+          </span>
+          <svg
+            className={`h-5 w-5 text-gray-400 transition-transform ${isOpen ? "rotate-180" : ""}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            strokeWidth={2}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
+      </button>
 
-      {section.signoffs.length === 0 ? (
-        <p className="text-xs text-gray-400">No signoffs yet</p>
-      ) : (
-        <div className="space-y-2">
-          {section.signoffs.map((so) => (
-            <SignoffRow key={so.id} signoff={so} />
-          ))}
+      {/* Expanded content */}
+      {isOpen && (
+        <div className="border-t border-gray-200">
+          {/* Signoffs */}
+          {section.signoffs.length > 0 && (
+            <div className="bg-gray-50 px-6 py-3 border-b border-gray-200">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Signoffs</p>
+              <div className="space-y-2">
+                {section.signoffs.map((so) => (
+                  <SignoffRow key={so.id} signoff={so} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Document folders */}
+          <div className="divide-y divide-gray-100">
+            {folders.map((folder) => (
+              <FolderRow
+                key={folder.code}
+                folder={folder}
+                documents={documents.filter((d) => d.folderCode === folder.code)}
+              />
+            ))}
+          </div>
         </div>
       )}
     </div>
   );
 }
+
+// =============================================================================
+// Folder Row — expandable folder with documents + upload
+// =============================================================================
+
+function FolderRow({
+  folder,
+  documents,
+}: {
+  folder: SectionFolder;
+  documents: SectionDocument[];
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [uploadMessage, setUploadMessage] = useState("");
+
+  function handleUpload() {
+    // PoC: simulate file upload
+    setUploadMessage("File upload dialog would open here (PoC)");
+    setTimeout(() => setUploadMessage(""), 3000);
+  }
+
+  return (
+    <div>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex w-full items-center justify-between px-6 py-3 text-left hover:bg-gray-50 transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          {/* Folder icon */}
+          <svg
+            className={`h-5 w-5 flex-shrink-0 ${documents.length > 0 ? "text-yellow-500" : "text-gray-300"}`}
+            fill="currentColor"
+            viewBox="0 0 20 20"
+          >
+            <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
+          </svg>
+          <div>
+            <p className="text-sm text-gray-900">
+              <span className="font-mono text-xs font-semibold text-indigo-600">{folder.code}</span>
+              <span className="mx-1.5 text-gray-300">—</span>
+              <span className="font-medium">{folder.label}</span>
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {documents.length > 0 && (
+            <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">
+              {documents.length}
+            </span>
+          )}
+          <svg
+            className={`h-4 w-4 text-gray-400 transition-transform ${isOpen ? "rotate-180" : ""}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            strokeWidth={2}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
+      </button>
+
+      {isOpen && (
+        <div className="bg-gray-50 px-6 pb-4 pt-1">
+          {/* Upload button */}
+          <div className="mb-3 flex items-center gap-3">
+            <button
+              onClick={handleUpload}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm hover:bg-gray-50 transition-colors"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" />
+              </svg>
+              Upload Document
+            </button>
+            {uploadMessage && (
+              <span className="text-xs text-indigo-600">{uploadMessage}</span>
+            )}
+          </div>
+
+          {/* Documents list */}
+          {documents.length === 0 ? (
+            <div className="flex h-16 items-center justify-center rounded-lg border-2 border-dashed border-gray-300">
+              <p className="text-xs text-gray-400">No documents uploaded yet</p>
+            </div>
+          ) : (
+            <div className="space-y-1">
+              {documents.map((doc) => {
+                const date = new Date(doc.uploadedAt);
+                return (
+                  <div
+                    key={doc.id}
+                    className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-2.5"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <FileIcon name={doc.name} />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-gray-900">{doc.name}</p>
+                        <p className="text-xs text-gray-500">
+                          {doc.uploadedBy} &middot;{" "}
+                          {date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                          &middot; {doc.size}
+                        </p>
+                      </div>
+                    </div>
+                    <button className="ml-4 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FileIcon({ name }: { name: string }) {
+  const ext = name.split(".").pop()?.toLowerCase() ?? "";
+  const colors: Record<string, string> = {
+    pdf: "text-red-500",
+    xlsx: "text-green-600",
+    xls: "text-green-600",
+    docx: "text-blue-600",
+    doc: "text-blue-600",
+    pptx: "text-orange-500",
+  };
+  const color = colors[ext] ?? "text-gray-400";
+  return (
+    <svg className={`h-5 w-5 flex-shrink-0 ${color}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+    </svg>
+  );
+}
+
+// =============================================================================
+// Signoff row
+// =============================================================================
 
 function SignoffRow({ signoff }: { signoff: Signoff }) {
   const roleLabel = ROLE_LABELS[signoff.role] ?? signoff.role;
@@ -219,9 +443,9 @@ function SignoffRow({ signoff }: { signoff: Signoff }) {
   );
 }
 
-// ---------------------------------------------------------------------------
+// =============================================================================
 // Workpaper card
-// ---------------------------------------------------------------------------
+// =============================================================================
 
 const WP_STATUS_STYLES: Record<string, { bg: string; text: string }> = {
   NOT_STARTED: { bg: "bg-gray-100", text: "text-gray-600" },
@@ -231,7 +455,7 @@ const WP_STATUS_STYLES: Record<string, { bg: string; text: string }> = {
 };
 
 function WorkpaperCard({ workpaper }: { workpaper: FieldworkWorkpaper }) {
-  const style = WP_STATUS_STYLES[workpaper.status] ?? WP_STATUS_STYLES.NOT_STARTED;
+  const wpStyle = WP_STATUS_STYLES[workpaper.status] ?? WP_STATUS_STYLES.NOT_STARTED;
   const totalMinutes = workpaper.steps.reduce((sum, s) => sum + s.timeSpentMinutes, 0);
   const totalHours = (totalMinutes / 60).toFixed(1);
 
@@ -257,7 +481,7 @@ function WorkpaperCard({ workpaper }: { workpaper: FieldworkWorkpaper }) {
             </p>
           </div>
         </div>
-        <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${style.bg} ${style.text}`}>
+        <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${wpStyle.bg} ${wpStyle.text}`}>
           {workpaper.status.replace(/_/g, " ")}
         </span>
       </div>

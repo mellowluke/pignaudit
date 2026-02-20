@@ -24,6 +24,98 @@ export const SECTION_PHASES: { key: SectionPhase; label: string }[] = [
 ];
 
 // =============================================================================
+// Section Document Folders (from SharePoint structure)
+// =============================================================================
+
+export interface SectionFolder {
+  code: string;
+  label: string;
+}
+
+export interface SectionDocument {
+  id: string;
+  folderCode: string;
+  name: string;
+  uploadedBy: string;
+  uploadedAt: string;
+  size: string;
+}
+
+export const SECTION_FOLDERS: Record<SectionPhase, SectionFolder[]> = {
+  PLANNING: [
+    { code: "P.000", label: "Pre-Audit Survey" },
+    { code: "P.100", label: "Budgeted Resource Allocation" },
+    { code: "P.101", label: "Communication Strategy and Status" },
+    { code: "P.102", label: "Audit Announcement" },
+    { code: "P.103", label: "Kick-off Meeting" },
+    { code: "P.200", label: "Planning Discussions - MAR, IS, Brainstorming" },
+    { code: "P.300", label: "Documentation of Understanding" },
+    { code: "P.400", label: "Walkthroughs" },
+    { code: "P.500", label: "Application Profile" },
+    { code: "P.600", label: "Risk and Control Matrix" },
+    { code: "P.700", label: "Fraud Questionnaire" },
+    { code: "P.800", label: "Audit Program" },
+  ],
+  FIELDWORK: [
+    { code: "T.000", label: "PBC Request List" },
+    { code: "T.100", label: "Communication of Progress and Status" },
+    { code: "T.200", label: "PAFs" },
+    { code: "T.300", label: "Testing Matrix" },
+    { code: "T.400", label: "Issue Log and PAF Mapping" },
+    { code: "T.500", label: "Operational Testing" },
+  ],
+  REPORTING: [
+    { code: "R.000", label: "Evaluation of Management Responses" },
+    { code: "R.100", label: "Draft Audit Report" },
+    { code: "R.200", label: "Management Approvals of Audit Report" },
+    { code: "R.300", label: "Closing Meeting" },
+    { code: "R.400", label: "Report Issuance Email Draft" },
+    { code: "R.500", label: "Final Report and Issuance" },
+  ],
+  CLOSING: [
+    { code: "C.100", label: "Budget to Actual" },
+    { code: "C.200", label: "Auditee Engagement Survey" },
+    { code: "C.300", label: "PAF Closing Support" },
+  ],
+};
+
+// Mock documents uploaded to section folders (keyed by engagementId)
+export const mockSectionDocuments: Record<string, SectionDocument[]> = {
+  "eng-001": [
+    { id: "sd-001", folderCode: "P.000", name: "Pre_Audit_Survey_Q1_2026.pdf", uploadedBy: "Sarah Chen", uploadedAt: "2026-01-15T09:00:00Z", size: "245 KB" },
+    { id: "sd-002", folderCode: "P.100", name: "Resource_Allocation_Budget.xlsx", uploadedBy: "Sarah Chen", uploadedAt: "2026-01-15T09:30:00Z", size: "128 KB" },
+    { id: "sd-003", folderCode: "P.102", name: "Audit_Announcement_Finance.pdf", uploadedBy: "Sarah Chen", uploadedAt: "2026-01-16T08:00:00Z", size: "89 KB" },
+    { id: "sd-004", folderCode: "P.103", name: "Kickoff_Meeting_Minutes.docx", uploadedBy: "Marcus Johnson", uploadedAt: "2026-01-17T15:00:00Z", size: "156 KB" },
+    { id: "sd-005", folderCode: "P.300", name: "Process_Understanding_AP.docx", uploadedBy: "Sarah Chen", uploadedAt: "2026-01-18T10:00:00Z", size: "312 KB" },
+    { id: "sd-006", folderCode: "P.400", name: "AP_Walkthrough_Notes.docx", uploadedBy: "Sarah Chen", uploadedAt: "2026-01-19T14:00:00Z", size: "178 KB" },
+    { id: "sd-007", folderCode: "P.600", name: "Risk_Control_Matrix_v2.xlsx", uploadedBy: "Sarah Chen", uploadedAt: "2026-01-20T11:00:00Z", size: "456 KB" },
+    { id: "sd-008", folderCode: "P.800", name: "Audit_Program_Financial_Controls.docx", uploadedBy: "David Kim", uploadedAt: "2026-01-18T09:00:00Z", size: "234 KB" },
+    { id: "sd-009", folderCode: "T.000", name: "PBC_Request_List_v1.xlsx", uploadedBy: "Sarah Chen", uploadedAt: "2026-01-22T08:30:00Z", size: "98 KB" },
+    { id: "sd-010", folderCode: "T.300", name: "Testing_Matrix_AP_Controls.xlsx", uploadedBy: "Sarah Chen", uploadedAt: "2026-01-25T10:00:00Z", size: "345 KB" },
+    { id: "sd-011", folderCode: "T.500", name: "Invoice_Testing_Workbook.xlsx", uploadedBy: "Sarah Chen", uploadedAt: "2026-02-01T16:00:00Z", size: "567 KB" },
+    { id: "sd-012", folderCode: "T.500", name: "Access_Review_Testing.xlsx", uploadedBy: "Sarah Chen", uploadedAt: "2026-02-05T14:00:00Z", size: "234 KB" },
+    { id: "sd-013", folderCode: "T.200", name: "PAF_001_SOD_Violation.docx", uploadedBy: "Sarah Chen", uploadedAt: "2026-02-03T10:00:00Z", size: "145 KB" },
+    { id: "sd-014", folderCode: "T.400", name: "Issue_Log_Financial_Controls.xlsx", uploadedBy: "Sarah Chen", uploadedAt: "2026-02-08T11:00:00Z", size: "189 KB" },
+  ],
+  "eng-003": [
+    { id: "sd-020", folderCode: "P.000", name: "Pre_Audit_Survey_Procurement.pdf", uploadedBy: "Emily Rodriguez", uploadedAt: "2025-11-01T09:00:00Z", size: "198 KB" },
+    { id: "sd-021", folderCode: "P.600", name: "RCM_Procurement.xlsx", uploadedBy: "Emily Rodriguez", uploadedAt: "2025-11-05T10:00:00Z", size: "389 KB" },
+    { id: "sd-022", folderCode: "P.800", name: "Audit_Program_Procurement.docx", uploadedBy: "Emily Rodriguez", uploadedAt: "2025-11-06T11:00:00Z", size: "267 KB" },
+    { id: "sd-023", folderCode: "T.000", name: "PBC_List_Procurement.xlsx", uploadedBy: "Emily Rodriguez", uploadedAt: "2025-11-15T08:00:00Z", size: "112 KB" },
+    { id: "sd-024", folderCode: "T.300", name: "Testing_Matrix_PO_Approvals.xlsx", uploadedBy: "Emily Rodriguez", uploadedAt: "2025-12-01T10:00:00Z", size: "445 KB" },
+    { id: "sd-025", folderCode: "R.100", name: "Draft_Report_Procurement.docx", uploadedBy: "Emily Rodriguez", uploadedAt: "2026-01-15T14:00:00Z", size: "534 KB" },
+  ],
+  "eng-004": [
+    { id: "sd-030", folderCode: "P.000", name: "Pre_Audit_Survey_Payroll.pdf", uploadedBy: "David Kim", uploadedAt: "2025-09-01T09:00:00Z", size: "176 KB" },
+    { id: "sd-031", folderCode: "P.800", name: "Audit_Program_Payroll.docx", uploadedBy: "David Kim", uploadedAt: "2025-09-05T10:00:00Z", size: "245 KB" },
+    { id: "sd-032", folderCode: "T.300", name: "Testing_Matrix_Payroll.xlsx", uploadedBy: "David Kim", uploadedAt: "2025-10-01T10:00:00Z", size: "312 KB" },
+    { id: "sd-033", folderCode: "R.500", name: "Final_Report_Payroll.pdf", uploadedBy: "David Kim", uploadedAt: "2025-11-25T14:00:00Z", size: "678 KB" },
+    { id: "sd-034", folderCode: "C.100", name: "Budget_vs_Actual_Payroll.xlsx", uploadedBy: "David Kim", uploadedAt: "2025-12-10T15:00:00Z", size: "89 KB" },
+    { id: "sd-035", folderCode: "C.200", name: "Engagement_Survey_Results.pdf", uploadedBy: "David Kim", uploadedAt: "2025-12-12T10:00:00Z", size: "134 KB" },
+  ],
+};
+
+// =============================================================================
 // Signoff / Approval
 // =============================================================================
 
