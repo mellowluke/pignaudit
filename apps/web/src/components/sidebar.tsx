@@ -102,6 +102,9 @@ export function Sidebar() {
             <p className="text-xs text-gray-500">Audit Manager</p>
           </div>
         </div>
+        <p className="mt-3 text-center text-xs text-gray-400">
+          Built by John and Ben
+        </p>
       </div>
     </aside>
   );
