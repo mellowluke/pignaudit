@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import {
   type AuditTrailStore,
   type AuditTrailEvent,
@@ -24,6 +24,7 @@ interface UploadedFile {
   type: string;
   uploadedAt: string;
   uploadedBy: string;
+  previewUrl?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -59,6 +60,21 @@ const CATEGORIES: {
 // Mock pre-existing data
 // ---------------------------------------------------------------------------
 
+// Placeholder SVG images for mock image files
+const MOCK_IMAGE_PLACEHOLDER = (label: string, color: string) =>
+  `data:image/svg+xml;charset=utf-8,${encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600">
+      <rect width="800" height="600" fill="${color}"/>
+      <rect x="50" y="50" width="700" height="500" rx="8" fill="rgba(255,255,255,0.15)"/>
+      <circle cx="200" cy="180" r="60" fill="rgba(255,255,255,0.25)"/>
+      <rect x="80" y="280" width="640" height="12" rx="6" fill="rgba(255,255,255,0.3)"/>
+      <rect x="80" y="308" width="500" height="10" rx="5" fill="rgba(255,255,255,0.2)"/>
+      <rect x="80" y="330" width="580" height="10" rx="5" fill="rgba(255,255,255,0.2)"/>
+      <text x="400" y="490" font-family="system-ui,sans-serif" font-size="20" font-weight="600"
+            fill="rgba(255,255,255,0.9)" text-anchor="middle">${label}</text>
+    </svg>`
+  )}`;
+
 const MOCK_DOCUMENTS: Record<
   string,
   Record<DocumentCategory, UploadedFile[]>
@@ -81,6 +97,15 @@ const MOCK_DOCUMENTS: Record<
         uploadedAt: "2026-01-16",
         uploadedBy: "Sarah Chen",
       },
+      {
+        id: "doc-img-1",
+        name: "AP_Process_Flowchart.png",
+        size: 184000,
+        type: "image/png",
+        uploadedAt: "2026-01-18",
+        uploadedBy: "Sarah Chen",
+        previewUrl: MOCK_IMAGE_PLACEHOLDER("AP Process Flowchart", "#4f46e5"),
+      },
     ],
     testing: [
       {
@@ -90,6 +115,15 @@ const MOCK_DOCUMENTS: Record<
         type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         uploadedAt: "2026-01-28",
         uploadedBy: "Sarah Chen",
+      },
+      {
+        id: "doc-img-2",
+        name: "Invoice_Exception_Screenshot.jpg",
+        size: 98000,
+        type: "image/jpeg",
+        uploadedAt: "2026-02-03",
+        uploadedBy: "Sarah Chen",
+        previewUrl: MOCK_IMAGE_PLACEHOLDER("Invoice Exception Screenshot", "#0891b2"),
       },
     ],
     findings: [],
@@ -122,6 +156,15 @@ const MOCK_DOCUMENTS: Record<
         uploadedAt: "2025-12-18",
         uploadedBy: "Emily Rodriguez",
       },
+      {
+        id: "doc-img-3",
+        name: "Vendor_Approval_Email.png",
+        size: 76000,
+        type: "image/png",
+        uploadedAt: "2025-12-20",
+        uploadedBy: "Emily Rodriguez",
+        previewUrl: MOCK_IMAGE_PLACEHOLDER("Vendor Approval Email", "#059669"),
+      },
     ],
     findings: [
       {
@@ -131,6 +174,15 @@ const MOCK_DOCUMENTS: Record<
         type: "application/pdf",
         uploadedAt: "2026-01-10",
         uploadedBy: "Emily Rodriguez",
+      },
+      {
+        id: "doc-img-4",
+        name: "Missing_Approval_Evidence.jpg",
+        size: 134000,
+        type: "image/jpeg",
+        uploadedAt: "2026-01-12",
+        uploadedBy: "Emily Rodriguez",
+        previewUrl: MOCK_IMAGE_PLACEHOLDER("Missing Approval Evidence", "#dc2626"),
       },
     ],
   },
@@ -251,6 +303,7 @@ export default function EngagementDocuments({
   );
   const [flags, setFlags] = useState<PolicyFlag[]>([]);
   const [recentFlags, setRecentFlags] = useState<PolicyFlag[]>([]);
+  const [previewFile, setPreviewFile] = useState<UploadedFile | null>(null);
 
   const getDocumentCounts = useCallback((): Record<string, number> => {
     return {
@@ -268,21 +321,40 @@ export default function EngagementDocuments({
     category: DocumentCategory,
     files: FileList
   ) => {
-    const newFiles: UploadedFile[] = Array.from(files).map((file) => ({
-      id: `upload-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      name: file.name,
-      size: file.size,
-      type: file.type || "application/octet-stream",
-      uploadedAt: new Date().toISOString().split("T")[0],
-      uploadedBy: "Current User",
-    }));
+    const fileArray = Array.from(files);
 
-    // Update documents first so counts are accurate
-    const updatedDocs = {
-      ...documents,
-      [category]: [...documents[category], ...newFiles],
-    };
-    setDocuments(updatedDocs);
+    // For image files, read as data URLs for preview; then update state
+    const readPromises = fileArray.map(
+      (file) =>
+        new Promise<UploadedFile>((resolve) => {
+          const base: UploadedFile = {
+            id: `upload-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            name: file.name,
+            size: file.size,
+            type: file.type || "application/octet-stream",
+            uploadedAt: new Date().toISOString().split("T")[0],
+            uploadedBy: "Current User",
+          };
+          if (file.type.startsWith("image/")) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              resolve({ ...base, previewUrl: e.target?.result as string });
+            };
+            reader.onerror = () => resolve(base);
+            reader.readAsDataURL(file);
+          } else {
+            resolve(base);
+          }
+        })
+    );
+
+    Promise.all(readPromises).then((newFiles) => {
+      // Update documents first so counts are accurate
+      const updatedDocs = {
+        ...documents,
+        [category]: [...documents[category], ...newFiles],
+      };
+      setDocuments(updatedDocs);
 
     // Record audit trail event for each file and evaluate policies
     const allNewFlags: PolicyFlag[] = [];
@@ -313,6 +385,7 @@ export default function EngagementDocuments({
       // Clear flash after 10 seconds
       setTimeout(() => setRecentFlags([]), 10000);
     }
+    }); // end Promise.all
   };
 
   const handleRemoveFile = (category: DocumentCategory, fileId: string) => {
@@ -498,11 +571,38 @@ export default function EngagementDocuments({
                         className="flex items-center justify-between rounded-md border border-gray-100 bg-gray-50 px-4 py-3"
                       >
                         <div className="flex items-center gap-3 min-w-0">
-                          <span
-                            className={`inline-flex h-9 w-9 items-center justify-center rounded text-xs font-bold ${getFileIconColor(file.type)}`}
-                          >
-                            {getFileIcon(file.type)}
-                          </span>
+                          {file.type.startsWith("image/") && file.previewUrl ? (
+                            <button
+                              type="button"
+                              onClick={() => setPreviewFile(file)}
+                              className="relative inline-flex h-9 w-9 flex-shrink-0 items-center justify-center overflow-hidden rounded cursor-zoom-in group"
+                              title="View image"
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={file.previewUrl}
+                                alt={file.name}
+                                className="h-full w-full object-cover"
+                              />
+                              <span className="absolute inset-0 flex items-center justify-center rounded bg-black/0 group-hover:bg-black/30 transition-colors">
+                                <svg
+                                  className="h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                  strokeWidth={2.5}
+                                >
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 1010.5 18a7.5 7.5 0 006.15-3.35zM10.5 13.5V10.5m0 0V7.5m0 3H7.5m3 0h3" />
+                                </svg>
+                              </span>
+                            </button>
+                          ) : (
+                            <span
+                              className={`inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded text-xs font-bold ${getFileIconColor(file.type)}`}
+                            >
+                              {getFileIcon(file.type)}
+                            </span>
+                          )}
                           <div className="min-w-0">
                             <p className="truncate text-sm font-medium text-gray-900">
                               {file.name}
@@ -513,25 +613,45 @@ export default function EngagementDocuments({
                             </p>
                           </div>
                         </div>
-                        <button
-                          onClick={() => handleRemoveFile(key, file.id)}
-                          className="ml-4 flex-shrink-0 rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors"
-                          title="Remove file"
-                        >
-                          <svg
-                            className="h-4 w-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                            strokeWidth={2}
+                        <div className="ml-4 flex flex-shrink-0 items-center gap-1">
+                          {file.type.startsWith("image/") && file.previewUrl && (
+                            <button
+                              type="button"
+                              onClick={() => setPreviewFile(file)}
+                              className="rounded p-1 text-gray-400 hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
+                              title="View image"
+                            >
+                              <svg
+                                className="h-4 w-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                                strokeWidth={2}
+                              >
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 1010.5 18a7.5 7.5 0 006.15-3.35z" />
+                              </svg>
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleRemoveFile(key, file.id)}
+                            className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+                            title="Remove file"
                           >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                            />
-                          </svg>
-                        </button>
+                            <svg
+                              className="h-4 w-4"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                              strokeWidth={2}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                              />
+                            </svg>
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -546,6 +666,14 @@ export default function EngagementDocuments({
           </div>
         );
       })}
+
+      {/* Image lightbox */}
+      {previewFile && (
+        <ImageLightbox
+          file={previewFile}
+          onClose={() => setPreviewFile(null)}
+        />
+      )}
     </div>
   );
 }
@@ -770,6 +898,83 @@ function PolicyFlagAlert({
             Acknowledge
           </button>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Image Lightbox — cross-browser compatible (Chrome, Edge, Safari)
+// Uses a plain React overlay instead of <dialog> to avoid browser inconsistencies
+// ---------------------------------------------------------------------------
+
+function ImageLightbox({
+  file,
+  onClose,
+}: {
+  file: UploadedFile;
+  onClose: () => void;
+}) {
+  // Close on Escape key — works in all modern browsers
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handleKey);
+    // Prevent body scroll while lightbox is open
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", handleKey);
+      document.body.style.overflow = prev;
+    };
+  }, [onClose]);
+
+  return (
+    // Overlay: fixed + high z-index, works in Chrome/Edge/Safari
+    // Using onClick on the backdrop to close, stopPropagation on inner container
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Preview: ${file.name}`}
+      style={{ position: "fixed", inset: 0, zIndex: 9999 }}
+      className="flex items-center justify-center"
+      onClick={onClose}
+    >
+      {/* Backdrop — semi-opaque black, no backdrop-filter to avoid Edge issues */}
+      <div
+        style={{ position: "absolute", inset: 0, backgroundColor: "rgba(0,0,0,0.85)" }}
+      />
+
+      {/* Content panel */}
+      <div
+        style={{ position: "relative", maxWidth: "90vw", maxHeight: "90vh" }}
+        className="flex flex-col rounded-lg overflow-hidden shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Toolbar */}
+        <div className="flex items-center justify-between bg-gray-900 px-4 py-2 gap-4">
+          <p className="truncate text-sm font-medium text-gray-100">{file.name}</p>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-shrink-0 rounded p-1.5 text-gray-400 hover:bg-gray-700 hover:text-white transition-colors"
+            title="Close (Esc)"
+          >
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Image — object-contain keeps aspect ratio in all browsers */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={file.previewUrl}
+          alt={file.name}
+          style={{ maxWidth: "90vw", maxHeight: "calc(90vh - 48px)", display: "block" }}
+          className="object-contain bg-gray-800"
+        />
       </div>
     </div>
   );
