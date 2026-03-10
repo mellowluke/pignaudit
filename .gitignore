@@ -50,3 +50,9 @@ dump.rdb
 *.log
 npm-debug.log*
 pnpm-debug.log*
+
+# TypeScript incremental build cache
+*.tsbuildinfo
+
+# npm lockfile (project uses pnpm)
+package-lock.json
